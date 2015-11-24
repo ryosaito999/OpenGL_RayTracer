@@ -37,7 +37,22 @@ Vector_3D<double> Phong_Shader::
 Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<double>& intersection_point,const Vector_3D<double>& same_side_normal) const
 {
     Vector_3D<double> color;
-    // TODO: determine the color
+
+    for (unsigned int i = 0; i< world.lights.size() ; ++i){
+
+        
+        Vector_3D<double> dirToLight =  world.lights[i]->position - intersection_point;
+        double diffuseLight = Vector_3D<double>:: Dot_Product( dirToLight,same_side_normal);
+        diffuseLight = max(0.0, diffuseLight);
+
+        Vector_3D<double> ref = dirToLight - ray.direction;
+        double reflecive = Vector_3D<double>::Dot_Product(same_side_normal, ref);
+        reflecive = max(0.0, reflecive);
+
+        Vector_3D<double> col = world.lights[i]->Emitted_Light(ray);
+        color += color_diffuse * col * diffuseLight + color_ambient *col * reflecive;
+    }
+
     return color;
 }
 
