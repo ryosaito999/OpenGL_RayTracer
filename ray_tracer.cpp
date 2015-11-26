@@ -38,28 +38,28 @@ Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<d
 {
     Vector_3D<double> color;
     for (unsigned int i = 0; i< world.lights.size() ; ++i){
+        //color += color_ambient*col*1.0; guess you dont need tjis?       
 
+        //diffuse stuff
         Vector_3D<double> light =  world.lights[i]->position - intersection_point;
         light.Normalize();
 
         double diffuseLight = Vector_3D<double>:: Dot_Product(light, same_side_normal);
         diffuseLight = max(0.0, diffuseLight);
 
+        //specular stuff
         Vector_3D<double> v = ray.endpoint - intersection_point;
-        v.Normalize();
-
         Vector_3D<double> r = (same_side_normal  * diffuseLight * 2) - light;
         r.Normalize();
+        v.Normalize();
 
         double spec = max(0.0, Vector_3D<double>:: Dot_Product(v,r));
+        
         Vector_3D<double> col = world.lights[i]->Emitted_Light(ray);
-
-        //color += color_ambient*col*1.0;        
         Ray shadowRay(intersection_point,world.lights[i]->position );
 
         if( world.enable_shadows){
             for ( int j = 0; j < world.objects.size(); ++j){
-
                 if(!world.objects[j] -> Intersection(shadowRay) )                   
                     color +=  color_diffuse * col * diffuseLight + color_specular *col * pow(spec,specular_power);//anything else?;
             }
@@ -73,11 +73,22 @@ Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<d
 
 Vector_3D<double> Reflective_Shader::
 Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<double>& intersection_point,const Vector_3D<double>& same_side_normal) const
-{
-    Vector_3D<double> color;
+{   
 
-    // TODO: determine the color
+    //R = V – 2 * (V·N) * N 
+    //http://paulbourke.net/geometry/reflected/
 
+    //add to current phong shader
+    Vector_3D<double> color = Phong_Shader::Shade_Surface(ray, intersection_object, intersection_point, same_side_normal);
+
+    //create new ray to cast -> look at slides pls
+    Ray reflector;
+    
+    //reflection needs to go back to camera so start with intersect -> camera
+    reflector. endpoint = intersection_point +same_side_normal * intersection_object.small_t;
+    reflector.direction = ray.direction - same_side_normal * 2* Vector_3D<double>::Dot_Product(ray.direction , same_side_normal)  ;
+    
+    color +=  world.Cast_Ray(reflector, ray) * reflectivity  ;
     return color;
 }
 
@@ -95,7 +106,6 @@ Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<d
 bool Sphere::
 Intersection(Ray& ray) const
 {
-    // TODO
     
     double a = Vector_3D<double>::Dot_Product(ray.direction, ray.direction);
     double b = 2 * Vector_3D<double>::Dot_Product(ray.direction, ray.endpoint - center);
@@ -126,18 +136,23 @@ Intersection(Ray& ray) const
         else
             return false;
     
-        if( ray.semi_infinite == true ){
+        // if ray hasnt hit anything yet, then set semi to false and mark 
+        //new object as rays intersection. T is intersection point
+        if( ray.semi_infinite == true && t>small_t ){
             ray.current_object = this;
+            ray.t_max = t;
             ray.semi_infinite = false;
-            ray.t_max = t;
+
             return true;
         }
-        else if(ray.semi_infinite == false &&  t < ray.t_max){
+        // if ray is already set to an object, check if current obj is closer
+        // if it is set t to new value
+        else if(ray.semi_infinite == false &&  t < ray.t_max  && t>small_t){
             ray.current_object = this;
             ray.t_max = t;
             return true;
         }
-        
+
         return false;
     }
 
@@ -161,13 +176,15 @@ Intersection(Ray& ray) const
     double d = Vector_3D <double> :: Dot_Product( normal ,  ray.direction );
     double t = n/d;    
 
-    if( ray.semi_infinite == true ){
+    if( ray.semi_infinite == true && t>small_t ){
         ray.current_object = this;
-        ray.semi_infinite = false;
         ray.t_max = t;
+        ray.semi_infinite = false;
+
         return true;
     }
-    else if(ray.semi_infinite == false  && t < ray.t_max){
+
+    else if(ray.semi_infinite == false  && t < ray.t_max  && t>small_t){
         ray.current_object = this;
         ray.t_max = t;
         return true;
@@ -189,7 +206,7 @@ Vector_3D<double> Camera::
 World_Position(const Vector_2D<int>& pixel_index)
 {
     Vector_2D<double> d = film.pixel_grid.X(pixel_index);
-    Vector_3D<double> result = + focal_point + horizontal_vector * d.x + vertical_vector * d.y; 
+    Vector_3D<double> result =  focal_point + horizontal_vector * d.x + vertical_vector * d.y; 
     return result;
 }
 //--------------------------------------------------------------------------------
