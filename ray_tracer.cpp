@@ -62,13 +62,11 @@ Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<d
                 const Object *obj = world.Closest_Intersection(shadowRay);
 
                 if(!obj)
-                    color = col * color_ambient + color_diffuse * col * diffuseLight + color_specular *col * pow(spec,specular_power);//anything else?;
-                else
-                    color = col * color_ambient;
+                    color += col * color_ambient*.2 + color_diffuse * col * diffuseLight + color_specular *col * pow(spec,specular_power);//anything else?;
          }
 
          else{
-            color = col * color_ambient + color_diffuse * col * diffuseLight + color_specular *col * pow(spec,specular_power);//anything else?;
+            color+= col * color_ambient*.2  + color_diffuse * col * diffuseLight + color_specular *col * pow(spec,specular_power);//anything else?;
         }
     }
 
@@ -107,26 +105,77 @@ Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<d
     return color;
 }
 
-Vector_3D<double> Checker_Shader::
+Vector_3D<double> CheckerBoard_Shader::
 Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<double>& intersection_point,const Vector_3D<double>& same_side_normal) const
 {
 
-	Vector_3D <double>color;
-	double x = intersection_point.x;
-	double z = intersection_point.z;
 
-    if(z < 0)
-        z = -z+1;
-    if(x < 0)
-        x = -x+1;
+    Vector_3D <double>color;
 
 
-	int n = ((int)x + (int)z)%2;
+    for (int i = 0; i< world.lights.size() ; ++i){
+        //color += color_ambient*col*1.0; guess you dont need tjis?       
 
-	if(	n == 1)
-		color = Vector_3D<double>(1,1,1);
+        //diffuse stuff
+        Vector_3D<double> light =  world.lights[i]->position - intersection_point;
+        light.Normalize();
+
+        double diffuseLight = Vector_3D<double>:: Dot_Product(light, same_side_normal);
+        diffuseLight = max(0.0, diffuseLight);
+
+        //specular stuff
+        Vector_3D<double> v = ray.endpoint - intersection_point;
+        Vector_3D<double> r = (same_side_normal  * diffuseLight * 2) - light;
+        r.Normalize();
+        v.Normalize();
+
+        double spec = max(0.0, Vector_3D<double>:: Dot_Product(v,r));
+        
+        Vector_3D<double> col = world.lights[i]->Emitted_Light(ray);
+        Ray shadowRay(intersection_point + same_side_normal* intersection_object.small_t, light );
+
+        if( world.enable_shadows){
+                const Object *obj = world.Closest_Intersection(shadowRay);
+
+                if(!obj){
+                    double x = intersection_point.x;
+                    double z = intersection_point.z;
+
+                    //shift to the right by 1
+                    if(z < 0)
+                        z = -z+1;
+                    if(x < 0)
+                        x = -x+1;
+
+                    int n = ((int)x + (int)z)%2;
+
+                    if( n == 1)
+                        color= Vector_3D<double>(1,1,1);
+                }
+         }
+
+         else{
+            double x = intersection_point.x;
+            double z = intersection_point.z;
+
+            //shift to the right by 1
+            if(z < 0)
+                z = -z+1;
+            if(x < 0)
+                x = -x+1;
+
+            int n = ((int)x + (int)z)%2;
+
+            if( n == 1)
+                color= Vector_3D<double>(1,1,1);
+                
+        }
+    }
+
 
 	return color;
+
+
 }
 
 //--------------------------------------------------------------------------------

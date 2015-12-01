@@ -328,13 +328,16 @@ public:
     Vector_3D<double> Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<double>& intersection_point,const Vector_3D<double>& same_side_normal) const;
 };
 
-class Checker_Shader : public Shader
+class CheckerBoard_Shader : public Shader
 {
 public:
-    Vector_3D<double> color;
+    Vector_3D<double> color_ambient,color_diffuse,color_specular;
+    double specular_power;
 
-    Checker_Shader(Render_World& world_input,const Vector_3D<double>& color=Vector_3D<double>(1,1,1))
-        :Shader(world_input),color(color)
+    CheckerBoard_Shader(Render_World& world_input,
+        const Vector_3D<double>& color_ambient,const Vector_3D<double>& color_diffuse,
+        const Vector_3D<double>& color_specular=Vector_3D<double>(1,1,1),const double specular_power=50)
+        :Shader(world_input),color_ambient(color_ambient),color_diffuse(color_diffuse),color_specular(color_specular),specular_power(specular_power)
     {}
 
     Vector_3D<double> Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<double>& intersection_point,const Vector_3D<double>& same_side_normal) const;
