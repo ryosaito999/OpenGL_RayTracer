@@ -37,7 +37,7 @@ Vector_3D<double> Phong_Shader::
 Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<double>& intersection_point,const Vector_3D<double>& same_side_normal) const
 {
     Vector_3D<double> color;
-    for (unsigned int i = 0; i< world.lights.size() ; ++i){
+    for (int i = 0; i< world.lights.size() ; ++i){
         //color += color_ambient*col*1.0; guess you dont need tjis?       
 
         //diffuse stuff
@@ -56,19 +56,25 @@ Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<d
         double spec = max(0.0, Vector_3D<double>:: Dot_Product(v,r));
         
         Vector_3D<double> col = world.lights[i]->Emitted_Light(ray);
-        Ray shadowRay(intersection_point,world.lights[i]->position - intersection_point );
+        Ray shadowRay(intersection_point + same_side_normal* intersection_object.small_t, light );
 
         if( world.enable_shadows){
-            //go through each object and cast a ray towards the light
-            for ( int j = 0; j < world.objects.size(); ++j){
-                if(!world.objects[j] -> Intersection(shadowRay) )                   
-                    color +=  color_diffuse * col * diffuseLight + color_specular *col * pow(spec,specular_power);//anything else?;
-            }
+                const Object *obj = world.Closest_Intersection(shadowRay);
+
+                if(!obj)
+                    color = col * color_ambient + color_diffuse * col * diffuseLight + color_specular *col * pow(spec,specular_power);//anything else?;
+                else
+                    color = col * color_ambient;
          }
+
          else{
-            color += color_diffuse * col * diffuseLight + color_specular *col * pow(spec,specular_power);//anything else?;
+            color = col * color_ambient + color_diffuse * col * diffuseLight + color_specular *col * pow(spec,specular_power);//anything else?;
         }
     }
+
+///    reflector.direction = -(ray.direction - same_side_normal * 2* Vector_3D<double>::Dot_Product(ray.direction , same_side_normal))  ;
+   	
+
     return color;
 }
 
@@ -86,11 +92,12 @@ Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<d
     Ray reflector;
     
     //reflection needs to go back to camera so start with intersect -> camera
-    reflector. endpoint = intersection_point;
+    reflector. endpoint = intersection_point + same_side_normal * intersection_object.small_t;
     reflector.direction = ray.direction - same_side_normal * 2* Vector_3D<double>::Dot_Product(ray.direction , same_side_normal)  ;
     
     //cast the ray and add it to the phong shader
     color +=  world.Cast_Ray(reflector, ray) * reflectivity  ;
+
     return color;
 }
 
@@ -98,6 +105,28 @@ Vector_3D<double> Flat_Shader::
 Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<double>& intersection_point,const Vector_3D<double>& same_side_normal) const
 {
     return color;
+}
+
+Vector_3D<double> Checker_Shader::
+Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<double>& intersection_point,const Vector_3D<double>& same_side_normal) const
+{
+
+	Vector_3D <double>color;
+	double x = intersection_point.x;
+	double z = intersection_point.z;
+
+    if(z < 0)
+        z = -z+1;
+    if(x < 0)
+        x = -x+1;
+
+
+	int n = ((int)x + (int)z)%2;
+
+	if(	n == 1)
+		color = Vector_3D<double>(1,1,1);
+
+	return color;
 }
 
 //--------------------------------------------------------------------------------
@@ -249,23 +278,23 @@ Render_Pixel(const Vector_2D<int>& pixel_index)
     Ray ray;
     Vector_3D<double> color;
     Vector_3D <double>pixelPos = camera.World_Position(pixel_index);
-    cout << pixelPos.x << endl;
-    for ( float i = 0; i < 2; i++){
-        for ( float j = 0; j < 2 ; j++){
+    float AAfactor = 4; 
+    for ( float i = 0; i < AAfactor; i++){
+        for ( float j = 0; j < AAfactor ; j++){
             ray.endpoint = camera.position;
             ray.direction =pixelPos - camera.position;
 
             ray.t_max = 1000;
             ray.semi_infinite = true;
-            color+=Cast_Ray(ray,dummy_root);
+            color+= Cast_Ray(ray,dummy_root) * (1/(AAfactor*2)) ;
             
             //ummm i got this by gettting the pxiel width manually 
             // i dont know how to get the actual width
-            pixelPos.x += camera.film.pixel_grid.dx/2;
+            pixelPos.x += camera.film.pixel_grid.dx/AAfactor;
 
         }
         
-        pixelPos.y += camera.film.pixel_grid.dy/2;
+        pixelPos.y += camera.film.pixel_grid.dy/AAfactor;
 
     }
 
@@ -285,7 +314,7 @@ Cast_Ray(Ray& ray,const Ray& parent_ray)
     if( obj ){ 
         Vector_3D<double> intersect = ray.Point(ray.t_max);
         Vector_3D<double> normal = obj->Normal(intersect);
-        color =  obj->material_shader->Shade_Surface(ray, *obj, intersect, normal) * .25  ;
+        color =  obj->material_shader->Shade_Surface(ray, *obj, intersect, normal)  ;
     }
         
     

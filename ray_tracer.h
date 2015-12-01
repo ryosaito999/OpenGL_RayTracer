@@ -328,6 +328,20 @@ public:
     Vector_3D<double> Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<double>& intersection_point,const Vector_3D<double>& same_side_normal) const;
 };
 
+class Checker_Shader : public Shader
+{
+public:
+    Vector_3D<double> color;
+
+    Checker_Shader(Render_World& world_input,const Vector_3D<double>& color=Vector_3D<double>(1,1,1))
+        :Shader(world_input),color(color)
+    {}
+
+    Vector_3D<double> Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<double>& intersection_point,const Vector_3D<double>& same_side_normal) const;
+
+};
+
+
 //--------------------------------------------------------------------------------
 // Reflective_Shader
 //--------------------------------------------------------------------------------

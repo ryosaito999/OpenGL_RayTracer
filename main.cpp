@@ -85,7 +85,7 @@ void Initialize_World(Render_World& world,const int width,const int height,const
             world.camera.Focus_Camera(1,(double)width/(double)height,(double)70/(double)180*PI);
             break;
         case 2:
-            plane->material_shader=new Phong_Shader(world,plane_color,plane_color);
+            plane->material_shader=new Checker_Shader(world,plane_color);
             sphere->material_shader=new Phong_Shader(world,color1,color1);
             sphere2->material_shader=new Phong_Shader(world,color2,color2);
             world.enable_shadows=false;
