@@ -56,9 +56,10 @@ Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<d
         double spec = max(0.0, Vector_3D<double>:: Dot_Product(v,r));
         
         Vector_3D<double> col = world.lights[i]->Emitted_Light(ray);
-        Ray shadowRay(intersection_point,world.lights[i]->position );
+        Ray shadowRay(intersection_point,world.lights[i]->position - intersection_point );
 
         if( world.enable_shadows){
+            //go through each object and cast a ray towards the light
             for ( int j = 0; j < world.objects.size(); ++j){
                 if(!world.objects[j] -> Intersection(shadowRay) )                   
                     color +=  color_diffuse * col * diffuseLight + color_specular *col * pow(spec,specular_power);//anything else?;
@@ -85,9 +86,10 @@ Shade_Surface(const Ray& ray,const Object& intersection_object,const Vector_3D<d
     Ray reflector;
     
     //reflection needs to go back to camera so start with intersect -> camera
-    reflector. endpoint = intersection_point +same_side_normal * intersection_object.small_t;
+    reflector. endpoint = intersection_point;
     reflector.direction = ray.direction - same_side_normal * 2* Vector_3D<double>::Dot_Product(ray.direction , same_side_normal)  ;
     
+    //cast the ray and add it to the phong shader
     color +=  world.Cast_Ray(reflector, ray) * reflectivity  ;
     return color;
 }
@@ -110,20 +112,17 @@ Intersection(Ray& ray) const
     double a = Vector_3D<double>::Dot_Product(ray.direction, ray.direction);
     double b = 2 * Vector_3D<double>::Dot_Product(ray.direction, ray.endpoint - center);
     double c = Vector_3D<double>::Dot_Product(ray.endpoint - center, ray.endpoint - center) - radius * radius;
-    
     double g = b * b - 4 * a * c;
     
-    if( g < 0 ){
+    if( g < 0 )
         return false;
-    }
-
-
+    
     else{
         double t = 0;
         double t1 =(-b + sqrt( g) ) / (2.0 * a);
         double t2 = (-b - sqrt( g) ) / (2.0 * a);
         
-
+        
         if( t1 >= 0 && t2 < 0 ) 
             t = t1;
 
@@ -176,19 +175,21 @@ Intersection(Ray& ray) const
     double d = Vector_3D <double> :: Dot_Product( normal ,  ray.direction );
     double t = n/d;    
 
-    if( ray.semi_infinite == true && t>small_t ){
-        ray.current_object = this;
-        ray.t_max = t;
-        ray.semi_infinite = false;
+    if( t >= 0){
+	    if( ray.semi_infinite == true && t>small_t ){
+	        ray.current_object = this;
+	        ray.t_max = t;
+	        ray.semi_infinite = false;
 
-        return true;
-    }
+	        return true;
+	    }
 
-    else if(ray.semi_infinite == false  && t < ray.t_max  && t>small_t){
-        ray.current_object = this;
-        ray.t_max = t;
-        return true;
-    }
+	    else if(ray.semi_infinite == false  && t < ray.t_max  && t>small_t){
+	        ray.current_object = this;
+	        ray.t_max = t;
+	        return true;
+	    }
+	}
     
     return false;
     
@@ -202,11 +203,24 @@ Normal(const Vector_3D<double>& location) const
 // Camera
 //--------------------------------------------------------------------------------
 // Find the world position of the input pixel
+//~ float RandomFloat(float min, float max)
+//~ {
+    //~ // this  function assumes max > min, you may want 
+    //~ // more robust error checking for a non-debug build
+    //~ //assert(max > min); 
+    //~ float random = ((float) rand()) / (float) RAND_MAX;
+//~ 
+    //~ // generate (in your case) a float between 0 and (4.5-.78)
+    //~ // then add .78, giving you a float between .78 and 4.5
+    //~ float range = max - min;  
+    //~ return (random*range) + min;
+//~ }
+
 Vector_3D<double> Camera::
 World_Position(const Vector_2D<int>& pixel_index)
 {
     Vector_2D<double> d = film.pixel_grid.X(pixel_index);
-    Vector_3D<double> result =  focal_point + horizontal_vector * d.x + vertical_vector * d.y; 
+    Vector_3D<double> result =  focal_point + horizontal_vector *( d.x )  + vertical_vector * (d.y ) ; 
     return result;
 }
 //--------------------------------------------------------------------------------
@@ -232,10 +246,29 @@ Render_Pixel(const Vector_2D<int>& pixel_index)
 {
     // TODO
     Ray dummy_root;
-    Ray ray( camera.position, camera.World_Position(pixel_index) - camera.position);
-    ray.t_max = 1000;
-    ray.semi_infinite = true;
-    Vector_3D<double> color=Cast_Ray(ray,dummy_root);
+    Ray ray;
+    Vector_3D<double> color;
+    Vector_3D <double>pixelPos = camera.World_Position(pixel_index);
+    cout << pixelPos.x << endl;
+    for ( float i = 0; i < 2; i++){
+        for ( float j = 0; j < 2 ; j++){
+            ray.endpoint = camera.position;
+            ray.direction =pixelPos - camera.position;
+
+            ray.t_max = 1000;
+            ray.semi_infinite = true;
+            color+=Cast_Ray(ray,dummy_root);
+            
+            //ummm i got this by gettting the pxiel width manually 
+            // i dont know how to get the actual width
+            pixelPos.x += camera.film.pixel_grid.dx/2;
+
+        }
+        
+        pixelPos.y += camera.film.pixel_grid.dy/2;
+
+    }
+
     camera.film.Set_Pixel(pixel_index,Pixel_Color(color));
 }
 
@@ -244,14 +277,18 @@ Render_Pixel(const Vector_2D<int>& pixel_index)
 Vector_3D<double> Render_World::
 Cast_Ray(Ray& ray,const Ray& parent_ray)
 {
+    float coef = .25;
     // TODO
     Vector_3D<double> color;
-    const Object * obj = Closest_Intersection(ray);
-
+    const Object *obj = Closest_Intersection(ray);
+    
     if( obj ){ 
         Vector_3D<double> intersect = ray.Point(ray.t_max);
         Vector_3D<double> normal = obj->Normal(intersect);
-        return obj->material_shader->Shade_Surface(ray, *obj, intersect, normal);
+        color =  obj->material_shader->Shade_Surface(ray, *obj, intersect, normal) * .25  ;
     }
+        
+    
+
     return color;
 }

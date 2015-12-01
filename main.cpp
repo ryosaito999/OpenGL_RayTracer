@@ -10,6 +10,7 @@
 #include <GLUT/glut.h>
 #endif
 
+#include "CImg.h"
 #include "ray_tracer.h"
 #include <iostream>
 
@@ -21,7 +22,7 @@
 Render_World world;
 Driver driver(world);
 //--------------------------------------------------------------------------------
-void Display()
+void display()
 {
     glClear(GL_COLOR_BUFFER_BIT);
     if(world.camera.film.colors) glDrawPixels(WIDTH,HEIGHT,GL_RGBA,GL_UNSIGNED_INT_8_8_8_8,(GLvoid*)world.camera.film.colors);
@@ -32,7 +33,7 @@ void Display()
 void Handle_Idle()
 {
     driver.Render_More();
-    Display();
+    display();
 }
 //--------------------------------------------------------------------------------
 void Initialize_Opengl_And_Glut(int argc, char** argv)
@@ -41,7 +42,7 @@ void Initialize_Opengl_And_Glut(int argc, char** argv)
     glutInitDisplayMode(GLUT_SINGLE|GLUT_RGBA|GLUT_DOUBLE);
     glutInitWindowSize(WIDTH,HEIGHT);
     glutCreateWindow("Ray Tracer");
-    glutDisplayFunc(Display);
+    glutDisplayFunc(display);
     glutIdleFunc(Handle_Idle);
     glClearColor(0,0,0,0);
     glMatrixMode(GL_PROJECTION);
@@ -49,6 +50,8 @@ void Initialize_Opengl_And_Glut(int argc, char** argv)
     glOrtho(0.0, WIDTH, 0.0, HEIGHT, -1.0, 1.0);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
+    
+    
 }
 //--------------------------------------------------------------------------------
 void Usage(const std::string& exec)
@@ -135,7 +138,6 @@ int main(int argc, char** argv)
 
     Initialize_Opengl_And_Glut(argc,argv);
     Initialize_World(world,WIDTH,HEIGHT,test_number);
-
     glutMainLoop();
 
     return 0;
